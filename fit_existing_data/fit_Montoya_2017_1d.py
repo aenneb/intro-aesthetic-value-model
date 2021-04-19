@@ -21,12 +21,11 @@ home_dir = os.getcwd()
 sys.path.append((home_dir + "/python_packages"))
 from aestheticsModel import simExperiment
 
-# set further general parameters
-n_features = 2
+#%% Specifying settings for fits
 # bounds depend on number of specified features
-bounds = ((-np.inf, np.inf), (-np.inf, np.inf), # differencse between agent and stim mus
+bounds = ((-np.inf, np.inf), # differencse between agent and stim mus
           (0, np.inf), # agent var
-          (-np.inf, np.inf), (-np.inf, np.inf), # mus for p_true
+          (-np.inf, np.inf), # mus for p_true
           (0, np.inf), # p_true var
           (0, np.inf), (0, np.inf), (0, 1), (-np.inf, np.inf)) # w_r, w_V, alpha, bias
 
@@ -42,26 +41,23 @@ meta_quadratic = -2.5e-05
 data = np.polyval([meta_quadratic, meta_slope, meta_intercept], reps)
 
 # %% define a function that returns predictions
-def predict_avg_response(parameters, n_features, reps=reps):
-
-    # agent's system state
-    mu = np.repeat(0, n_features).astype(float)
-    agent_var = np.abs(parameters[n_features])
-    cov = np.eye(n_features)*agent_var
-
-    # p_true
-    mu_init = parameters[n_features+1:(n_features*2+1)]
-    p_true_var = np.abs(parameters[n_features*2+1])
-    cov_init = np.eye(n_features)*p_true_var
-
-    # strucutral
-    w_r = parameters[-4]
-    w_V = parameters[-3]
-    alpha = parameters[-2]
-    bias = parameters[-1]
+def predict_avg_response(parameters, reps=reps):
 
     # stimulus
-    stim_mu =  parameters[0:n_features]
+    stim_mu =  parameters[0]
+    # agent's system state
+    mu_state = np.array(0)
+    var_state = parameters[1]
+
+    # p_true
+    mu_true = parameters[2]
+    var_true = parameters[3]
+
+    # strucutral
+    w_r = parameters[4]
+    w_V = parameters[5]
+    alpha = parameters[6]
+    bias = parameters[7]
 
     # set up variables to track
     A_t_list = []
@@ -69,11 +65,11 @@ def predict_avg_response(parameters, n_features, reps=reps):
     # we run through the different numbers of exposure
     for rep in reps:
         # first, run through exposure trials
-        this_mu = simExperiment.simulate_practice_trials(mu, cov, alpha,
+        this_mu = simExperiment.simulate_practice_trials(mu_state, var_state, alpha,
                                                             stim_mu, n_stims=1,
                                                             stim_dur=rep)
         # then get final rating
-        A_t = simExperiment.calc_predictions(this_mu, cov, mu_init, cov_init,
+        A_t = simExperiment.calc_predictions(this_mu, var_state, mu_true, var_true,
                                                            alpha, stim_mu,
                                                            w_r, w_V, bias)
         A_t_list.append(A_t)
@@ -81,9 +77,10 @@ def predict_avg_response(parameters, n_features, reps=reps):
     return A_t_list
 
 #%% Define the cost function
-def cost_fn(parameters, n_features, data):
-    predictions = predict_avg_response(parameters, n_features)
+def cost_fn(parameters, data):
+    predictions = predict_avg_response(parameters)
     cost = np.sqrt(np.mean((predictions-data)**2))*1e3 # scale up to ease minimization
+    # print(cost)
     return cost
 
 # %% loop over several different starting points
@@ -92,20 +89,21 @@ for seed in range(1000):
     np.random.seed(seed)
 
     # minimization
-    parameters = np.random.rand(n_features*2+6)
+    parameters = np.random.rand(8)
     parameters[-2] = parameters[-2]/1e3 # scale the starting point for alpha
-    additional_arguments = tuple((n_features, data))
+    additional_arguments = tuple((data,))
 
     res = minimize(cost_fn, parameters, args=additional_arguments,
-                    method='SLSQP', 
+                    method='SLSQP',
                     bounds=bounds,
                     options={'disp': False, 'maxiter': 1e3, 'ftol': 1e-07})
+    # print(res)
     x_res = res.x.tolist()
     success = res.success
-    rmse = res.fun/1e3 # scale rmse back to true number
+    rmse = res.fun/1e3 # scale rmse bacck to true number
 
     # get predictions
-    predictions = predict_avg_response(x_res, n_features)
+    predictions = predict_avg_response(x_res)
 
     # %% automatically append results to the .csv
     if write_csv:
@@ -113,7 +111,7 @@ for seed in range(1000):
         myCsvRow = ",".join(map(str, res_list)) + "\n"
         with open((home_dir
                     + '/simulate_existing_experiments'
-                    + '/fit_results_Montoya_2017.csv'),'a') as fd:
+                    + '/fit_results_Montoya_2017_1d.csv'),'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data

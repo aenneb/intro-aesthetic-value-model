@@ -15,7 +15,6 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import nnls
 from matplotlib import pyplot as plt
-
 # import costum functions
 os.chdir('..')
 home_dir = os.getcwd()
@@ -103,47 +102,45 @@ def predict_experiment_data(parameters, data):
     SiNs_stim = [0, 0]
     stims = np.vstack((CoSy_stim, SiSy_stim, CoNs_stim, SiNs_stim))
 
-    r_exp1, dV_exp1 = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp1, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims)
-    r_exp2a, dV_exp2a = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2a, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[0,:])
-    r_exp2b, dV_exp2b = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2b, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[1,:])
-    r_exp2c, dV_exp2c = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2c, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[2,:])
-    r_exp2d, dV_exp2d = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2d, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[3,:])
-    r_exp3a, dV_exp3a = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3a, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[0,:])
-    r_exp3b, dV_exp3b = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3b, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[1,:])
-    r_exp3c, dV_exp3c = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3c, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[2,:])
-    r_exp3d, dV_exp3d = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3d, _ = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[3,:])
 
     pred_r = np.array([r_exp1,
                    r_exp2a, r_exp2b, r_exp2c, r_exp2d,
                    r_exp3a, r_exp3b, r_exp3c, r_exp3d]).flatten()
-    pred_dV = np.array([dV_exp1,
-                   dV_exp2a, dV_exp2b, dV_exp2c, dV_exp2d,
-                   dV_exp3a, dV_exp3b, dV_exp3c, dV_exp3d]).flatten()
+
     try:
         # lstsq with non-negativity constraint
-        weights = nnls(np.array([pred_r, pred_dV, np.ones(len(pred_r))]).T,
+        weights = nnls(np.array([pred_r, np.ones(len(pred_r))]).T,
                                data)[0]
-        predictions = weights[0]*pred_r + weights[1]*pred_dV + weights[2]
+        predictions = weights[0]*pred_r + weights[1]
     except:
-        weights = np.ones(3)
-        predictions = pred_r + pred_dV
+        weights = [1,0]
+        predictions = pred_r
 
     return predictions, weights
 
@@ -185,8 +182,8 @@ for seed in range(1000):
     symmetry_add = x_res[-2]
     alpha = x_res[-1]
     w_r = weights[0]
-    w_V = weights[1]
-    bias = weights[2]
+    w_V = 0
+    bias = weights[1]
 
     print(('Iteration ' + str(seed) + ' done.'))
     # automatically append simulation results to the .csv
@@ -200,7 +197,8 @@ for seed in range(1000):
         myCsvRow = ",".join(map(str, res_list))
         myCsvRow = myCsvRow + "\n"
         with open((home_dir +
-                    '/simulate_existing_experiments/fit_results_Tinio_2009_w_nnls_reg_free_stims.csv'),'a') as fd:
+                    '/simulate_existing_experiments/'
+                    + 'it_results_Tinio_2009_w_nnls_reg_free_stims_zero_w_V.csv'),'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data

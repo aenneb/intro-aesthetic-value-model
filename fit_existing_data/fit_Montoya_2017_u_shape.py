@@ -31,18 +31,20 @@ bounds = ((-np.inf, np.inf), (-np.inf, np.inf), # differencse between agent and 
           (0, np.inf), (0, np.inf), (0, 1), (-np.inf, np.inf)) # w_r, w_V, alpha, bias
 
 reps = np.arange(1, 51) # number of exposures per stimulus
+heterogeneous_reps = False # if true, reps of a given stimulus are consequtive
 
 plot = False # generate plot of results vs data?
 write_csv = True
 
 #%% generate data from polynomial fits
-meta_intercept = .66051
-meta_slope = 1.73e-03
-meta_quadratic = -2.5e-05
+meta_intercept = .69631
+meta_slope = - .00360
+meta_quadratic = .0000810
 data = np.polyval([meta_quadratic, meta_slope, meta_intercept], reps)
 
 # %% define a function that returns predictions
-def predict_avg_response(parameters, n_features, reps=reps):
+def predict_avg_response(parameters, n_features,
+                         heterogeneous_reps=False, reps=reps):
 
     # agent's system state
     mu = np.repeat(0, n_features).astype(float)
@@ -84,6 +86,7 @@ def predict_avg_response(parameters, n_features, reps=reps):
 def cost_fn(parameters, n_features, data):
     predictions = predict_avg_response(parameters, n_features)
     cost = np.sqrt(np.mean((predictions-data)**2))*1e3 # scale up to ease minimization
+    # print(cost)
     return cost
 
 # %% loop over several different starting points
@@ -97,12 +100,13 @@ for seed in range(1000):
     additional_arguments = tuple((n_features, data))
 
     res = minimize(cost_fn, parameters, args=additional_arguments,
-                    method='SLSQP', 
+                    method='SLSQP', #SLSQP, Powell
                     bounds=bounds,
                     options={'disp': False, 'maxiter': 1e3, 'ftol': 1e-07})
+    # print(res)
     x_res = res.x.tolist()
     success = res.success
-    rmse = res.fun/1e3 # scale rmse back to true number
+    rmse = res.fun/1e3 # scale rmse bacck to true number
 
     # get predictions
     predictions = predict_avg_response(x_res, n_features)
@@ -113,7 +117,7 @@ for seed in range(1000):
         myCsvRow = ",".join(map(str, res_list)) + "\n"
         with open((home_dir
                     + '/simulate_existing_experiments'
-                    + '/fit_results_Montoya_2017.csv'),'a') as fd:
+                    + '/fit_results_Montoya_2017_u_shape.csv'),'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data

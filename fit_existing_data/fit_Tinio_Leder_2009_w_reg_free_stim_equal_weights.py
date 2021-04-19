@@ -73,7 +73,8 @@ def predict_avg_response(mu, cov, mu_true, cov_true, alpha, stims,
     dV_list = []
     for stim in stims:
         _, r_t, dV = simExperiment.calc_predictions(new_mu, cov, mu_true, cov_true, alpha,
-                                         stim, return_r_t=True, return_dV=True)
+                                         stim, w_learn=1, bias=0,
+                                         return_r_t=True, return_dV=True)
         r_t_list.append(r_t)
         dV_list.append(dV)
 
@@ -138,11 +139,11 @@ def predict_experiment_data(parameters, data):
                    dV_exp3a, dV_exp3b, dV_exp3c, dV_exp3d]).flatten()
     try:
         # lstsq with non-negativity constraint
-        weights = nnls(np.array([pred_r, pred_dV, np.ones(len(pred_r))]).T,
-                               data)[0]
-        predictions = weights[0]*pred_r + weights[1]*pred_dV + weights[2]
+        weights = nnls(np.array([np.ones(len(pred_r))]).T,
+                               (data - pred_r - pred_dV))[0]
+        predictions = pred_r + pred_dV + weights[0]
     except:
-        weights = np.ones(3)
+        weights = np.zeros(1)
         predictions = pred_r + pred_dV
 
     return predictions, weights
@@ -184,9 +185,9 @@ for seed in range(1000):
     complex_add = x_res[-3]
     symmetry_add = x_res[-2]
     alpha = x_res[-1]
-    w_r = weights[0]
-    w_V = weights[1]
-    bias = weights[2]
+    w_r = 1
+    w_V = 1
+    bias = weights[0]
 
     print(('Iteration ' + str(seed) + ' done.'))
     # automatically append simulation results to the .csv
@@ -199,8 +200,10 @@ for seed in range(1000):
                     complex_add, symmetry_add] + pred_list
         myCsvRow = ",".join(map(str, res_list))
         myCsvRow = myCsvRow + "\n"
-        with open((home_dir +
-                    '/simulate_existing_experiments/fit_results_Tinio_2009_w_nnls_reg_free_stims.csv'),'a') as fd:
+        with open((home_dir
+                    + '/simulate_existing_experiments/'
+                    + 'fit_results_Tinio_2009_w_nnls_reg_free_stims_equal_weights.csv'),
+                  'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data

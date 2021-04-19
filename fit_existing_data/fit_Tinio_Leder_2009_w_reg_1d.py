@@ -26,13 +26,11 @@ from aestheticsModel import simExperiment
 plot = False # generate plot of results vs data?
 write_csv = True # write results into csv file?
 
-bounds = ((-np.inf, np.inf), (-np.inf, np.inf), # state mus
+bounds = ((-np.inf, np.inf), # state mu
           (0, np.inf), # state var
-          (-np.inf, np.inf), # state rho
-          (-np.inf, np.inf), (-np.inf, np.inf), # mus for p_true
+          (-np.inf, np.inf), # mu for p_true
           (0, np.inf), # p_true var
-          (-np.inf, np.inf), # true rho
-          (-np.inf, np.inf), (-np.inf, np.inf), #deviation of complex/symmetric stims
+          (-np.inf, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), (-np.inf, np.inf), # stimuli
           (0, 1)) # alpha
 
 # %% enter results reported by Tinio & Leder (2009)
@@ -56,7 +54,7 @@ all_reported_means = np.array([means_exp1,
 
 # %% define a function that returns predictions for given sequence of stimuli
 # and possibly familiarization trials
-def predict_avg_response(mu, cov, mu_true, cov_true, alpha, stims,
+def predict_avg_response(mu, cov, mu_true, var_true, alpha, stims,
                          sensory_weight=1, w_V=1,
                          bias=0, n_famil_trials=0, famil_stim=[]):
     # create copies of initial mu and cov as basis for true environment dist
@@ -72,8 +70,9 @@ def predict_avg_response(mu, cov, mu_true, cov_true, alpha, stims,
     r_t_list = []
     dV_list = []
     for stim in stims:
-        _, r_t, dV = simExperiment.calc_predictions(new_mu, cov, mu_true, cov_true, alpha,
-                                         stim, return_r_t=True, return_dV=True)
+        _, r_t, dV = simExperiment.calc_predictions(new_mu, cov, mu_true, var_true, alpha,
+                                         stim, w_learn=1, bias=0,
+                                         return_r_t=True, return_dV=True)
         r_t_list.append(r_t)
         dV_list.append(dV)
 
@@ -82,51 +81,42 @@ def predict_avg_response(mu, cov, mu_true, cov_true, alpha, stims,
 # %% for after fitting, we also want a fn that returns predicted avgs
 def predict_experiment_data(parameters, data):
 
-    mu_state = parameters[:2]
-    var_state = parameters[2]**2
-    rho_state = var_state**2 * parameters[3]
-    cov_state = [[var_state, rho_state],
-                           [rho_state, var_state]]
+    mu_state = parameters[0]
+    var_state = parameters[1]**2
     # repeat, for true distribution
-    mu_true = parameters[4:6]
-    var_true = parameters[6]**2
-    rho_true = var_true**2 * parameters[7]
-    cov_true = [[var_true, rho_true],
-                           [rho_true, var_true]]
-    alpha = parameters[-1]
-
-    # Define the experimental stimulus set
-    # For fitting, we only assume means of the distributions for each condition
-    CoSy_stim = [0+parameters[-3], 0+parameters[-2]]
-    SiSy_stim = [0, 0+parameters[-2]]
-    CoNs_stim = [0+parameters[-3], 0]
-    SiNs_stim = [0, 0]
+    mu_true = parameters[2]
+    var_true = parameters[3]**2
+    CoSy_stim = parameters[4]
+    SiSy_stim = parameters[5]
+    CoNs_stim = parameters[6]
+    SiNs_stim = parameters[7]
     stims = np.vstack((CoSy_stim, SiSy_stim, CoNs_stim, SiNs_stim))
+    alpha = np.abs(parameters[-1])
 
-    r_exp1, dV_exp1 = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp1, dV_exp1 = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims)
-    r_exp2a, dV_exp2a = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2a, dV_exp2a = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[0,:])
-    r_exp2b, dV_exp2b = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2b, dV_exp2b = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[1,:])
-    r_exp2c, dV_exp2c = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2c, dV_exp2c = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[2,:])
-    r_exp2d, dV_exp2d = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp2d, dV_exp2d = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=320, famil_stim=stims[3,:])
-    r_exp3a, dV_exp3a = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3a, dV_exp3a = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[0,:])
-    r_exp3b, dV_exp3b = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3b, dV_exp3b = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[1,:])
-    r_exp3c, dV_exp3c = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3c, dV_exp3c = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[2,:])
-    r_exp3d, dV_exp3d = predict_avg_response(mu_state, cov_state, mu_true, cov_true, alpha,
+    r_exp3d, dV_exp3d = predict_avg_response(mu_state, var_state, mu_true, var_true, alpha,
                                      stims,
                                      n_famil_trials=80, famil_stim=stims[3,:])
 
@@ -155,10 +145,10 @@ def cost_fn(parameters, data):
 
 #%% minimization
 # a few of these will get stuck and return nan after maxiter has been reached
-for seed in range(1000):
+for seed in range(100,1000):
     # set randomization seed for reproducibility
     np.random.seed(seed)
-    parameters = np.random.rand(11)
+    parameters = np.random.rand(9)
     # scale the starting point for alpha
     parameters[-1] = parameters[-1]/1e3
     additional_arguments = tuple((all_reported_means,))
@@ -172,35 +162,37 @@ for seed in range(1000):
 
     # get predictions
     predictions, weights = predict_experiment_data(x_res, all_reported_means)
-    mu_state_1 = x_res[0]
-    mu_state_2 = x_res[1]
-    var_state = x_res[2]**2
-    rho_state = var_state**2*x_res[3]
+    mu_state = x_res[0]
+    var_state = x_res[1]**2
     # repeat, for true distribution
-    mu_true_1 = x_res[4]
-    mu_true_2 = x_res[5]
-    var_true = x_res[6]**2
-    rho_true = var_true**2 * x_res[7]
-    complex_add = x_res[-3]
-    symmetry_add = x_res[-2]
-    alpha = x_res[-1]
+    mu_true = x_res[2]
+    var_true = x_res[3]**2
+    # stimuli
+    CoSy_stim = x_res[4]
+    SiSy_stim = x_res[5]
+    CoNs_stim = x_res[6]
+    SiNs_stim = x_res[7]
+    alpha = np.abs(x_res[8])
     w_r = weights[0]
     w_V = weights[1]
     bias = weights[2]
 
     print(('Iteration ' + str(seed) + ' done.'))
+
     # automatically append simulation results to the .csv
     if write_csv:
         rmse = res.fun
         success = res.success
         pred_list = predictions.tolist()
-        res_list = [seed, rmse, success, mu_state_1, mu_state_2, var_state, rho_state,
-                    mu_true_1, mu_true_2, var_true, rho_true, w_r, w_V, alpha, bias,
-                    complex_add, symmetry_add] + pred_list
+        res_list = [seed, rmse, success, mu_state, var_state,
+                    mu_true, var_true,
+                    CoSy_stim, SiSy_stim, CoNs_stim, SiNs_stim,
+                    w_r, w_V, alpha, bias] + pred_list
         myCsvRow = ",".join(map(str, res_list))
         myCsvRow = myCsvRow + "\n"
         with open((home_dir +
-                    '/simulate_existing_experiments/fit_results_Tinio_2009_w_nnls_reg_free_stims.csv'),'a') as fd:
+                    '/simulate_existing_experiments/'
+                    + 'fit_results_Tinio_2009_w_nnls_reg_1d.csv'),'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data

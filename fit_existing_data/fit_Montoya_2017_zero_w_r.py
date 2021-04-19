@@ -28,7 +28,7 @@ bounds = ((-np.inf, np.inf), (-np.inf, np.inf), # differencse between agent and 
           (0, np.inf), # agent var
           (-np.inf, np.inf), (-np.inf, np.inf), # mus for p_true
           (0, np.inf), # p_true var
-          (0, np.inf), (0, np.inf), (0, 1), (-np.inf, np.inf)) # w_r, w_V, alpha, bias
+          (0, np.inf), (0, 1), (-np.inf, np.inf)) # w_V, alpha, bias
 
 reps = np.arange(1, 51) # number of exposures per stimulus
 
@@ -55,7 +55,6 @@ def predict_avg_response(parameters, n_features, reps=reps):
     cov_init = np.eye(n_features)*p_true_var
 
     # strucutral
-    w_r = parameters[-4]
     w_V = parameters[-3]
     alpha = parameters[-2]
     bias = parameters[-1]
@@ -75,7 +74,7 @@ def predict_avg_response(parameters, n_features, reps=reps):
         # then get final rating
         A_t = simExperiment.calc_predictions(this_mu, cov, mu_init, cov_init,
                                                            alpha, stim_mu,
-                                                           w_r, w_V, bias)
+                                                           0, w_V, bias)
         A_t_list.append(A_t)
 
     return A_t_list
@@ -84,6 +83,7 @@ def predict_avg_response(parameters, n_features, reps=reps):
 def cost_fn(parameters, n_features, data):
     predictions = predict_avg_response(parameters, n_features)
     cost = np.sqrt(np.mean((predictions-data)**2))*1e3 # scale up to ease minimization
+    # print(cost)
     return cost
 
 # %% loop over several different starting points
@@ -92,17 +92,18 @@ for seed in range(1000):
     np.random.seed(seed)
 
     # minimization
-    parameters = np.random.rand(n_features*2+6)
+    parameters = np.random.rand(n_features*2+5)
     parameters[-2] = parameters[-2]/1e3 # scale the starting point for alpha
     additional_arguments = tuple((n_features, data))
 
     res = minimize(cost_fn, parameters, args=additional_arguments,
-                    method='SLSQP', 
+                    method='SLSQP', #SLSQP, Powell
                     bounds=bounds,
                     options={'disp': False, 'maxiter': 1e3, 'ftol': 1e-07})
+    # print(res)
     x_res = res.x.tolist()
     success = res.success
-    rmse = res.fun/1e3 # scale rmse back to true number
+    rmse = res.fun/1e3 # scale rmse bacck to true number
 
     # get predictions
     predictions = predict_avg_response(x_res, n_features)
@@ -113,7 +114,7 @@ for seed in range(1000):
         myCsvRow = ",".join(map(str, res_list)) + "\n"
         with open((home_dir
                     + '/simulate_existing_experiments'
-                    + '/fit_results_Montoya_2017.csv'),'a') as fd:
+                    + '/fit_results_Montoya_2017_zero_w_r.csv'),'a') as fd:
             fd.write(myCsvRow)
 
     # and plot them vs. data
