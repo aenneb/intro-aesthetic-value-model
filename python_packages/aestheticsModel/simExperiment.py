@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Apr 9
+based on simSetup.py and .py
 
 @author: abrielmann
 
@@ -11,27 +12,23 @@ import numpy as np
 from statistics import NormalDist # for 1D logLik
 
 def logLik_from_mahalanobis(stim, mu_x, cov, k=None):
-    """
-    Calculate the log likelihood of the current image given the presumed
+    """calculate the log likelihood of the current image given the presumed
     'system state' mu_x and covariance matrix cov based on the mahalanobis
-    distance between image feature vector and system state.
-    This function does accept singular covariances matrices as input and will
-    compute a pseudo-inverse in these cases.
-    This function also calculates the log-likelihood for the 1D case as the 
-    probability of the stimulus feature value based on the system state's PDF.
+    distance between image feature vector and vector representing the system
+    state
     """
     if k is None:
         k = 0
 
     stim = np.array(stim)
     mu_x = np.array(mu_x)
-    
+
     if mu_x.shape==(1,) or mu_x.shape==(): # if 1D
         if cov>0:
             z = NormalDist(mu=mu_x, sigma=cov).pdf(stim)
         else:
             z = 0
-            
+
         if z==0:
             log_p = np.log(1e-10)
         else:
@@ -51,14 +48,9 @@ def logLik_from_mahalanobis(stim, mu_x, cov, k=None):
 
 def KL_distributions(mu_true, cov_true, mu_state, cov_state):
     """
-    Compute the Kullback-Leibler divergence between two Gaussian distirbutions
-     specified by the input parameters.
-    See http://stanford.edu/~jduchi/projects/general_notes.pdf (last page) 
-    for a derivation for the n-dimensional case.
-    This function does accept singular covariances matrices as input and will
-    compute a pseudo-inverse and determinant in these cases.
-    this function also calculates KL divergence in a simplified manner 
-    in case the input is 1-dimensional.
+    derivation: http://stanford.edu/~jduchi/projects/general_notes.pdf
+    further additions were added to handle non-positive definite covariance
+    matrices and 1D case.
 
     Parameters
     ----------
@@ -77,14 +69,12 @@ def KL_distributions(mu_true, cov_true, mu_state, cov_state):
 
     """
     mu_diff = np.array(mu_state).astype(float) - np.array(mu_true).astype(float)
-    
-    # 1D case
+
     if np.array(mu_true).shape==() or np.array(mu_true).shape==(1,):
         if cov_state==0:
             KL = np.inf
         else:
             KL = np.log(cov_state/cov_true) + (cov_true-mu_diff**2)/(2*cov_state**2) - 0.5
-    # 2D or higher dimensional case
     else:
         n = len(mu_true)
         try:
@@ -98,7 +88,7 @@ def KL_distributions(mu_true, cov_true, mu_state, cov_state):
                 raise
         else:
             cov_state_det = np.linalg.det(cov_state)
-    
+
         try:
             np.linalg.inv(cov_true)
         except np.linalg.LinAlgError as err:
@@ -109,7 +99,7 @@ def KL_distributions(mu_true, cov_true, mu_state, cov_state):
                 raise
         else:
             cov_true_det = np.linalg.det(cov_true)
-    
+
         KL = (0.5 *
               np.log((cov_state_det / cov_true_det))
               - n
@@ -123,18 +113,18 @@ def simulate_practice_trials(mu, cov, alpha, stim_mu, n_stims, stim_dur):
     update agent's system state after exposure to n_stims stimuli from the
     stimulus distribution with means stim_mu for stim_dur each
     given an agent's system state as defined by mu and cov
-    Returns updated mu.
+    Returns updated mu
     This function abbreviates the simulation process by updating mu only once
-    summing up estimated changes.
+    summing up estimated changes
 
     Parameters
     ----------
     mu : array_like
         list or 1d-array of length n_features; means of agent's system state
-        before practice trials.
+        before practice trials
     cov : ndarrary
         array of size len(mu) x len(mu)
-       covariance of agent's system state.
+       covariance of agent's system state
     alpha : float
          magnitude of shift in mu towards currently 'presented' feature vector.
     stim_mu : ndarray
@@ -164,33 +154,35 @@ def simulate_practice_trials(mu, cov, alpha, stim_mu, n_stims, stim_dur):
     return mu_new
 
 
-def calc_predictions(mu, cov, mu_true, cov_true, alpha,
-                                   stim,
+def calc_predictions(mu, cov, mu_init, cov_init, alpha,
+                                   stim, stim_dur=0,
                                    w_r=1, w_V=1, bias=0,
-                                   return_mu=False, return_r_t=False, 
+                                   return_mu=False, return_r_t=False,
                                    return_dV=False):
     """
-    Calculates aesthetic value A for a given system state and stimulus 
-    given known p_true as specified by mu_true and cov_true.
+    Calculates A for a given system state and stimulus given known p_true
+    as specified by mu_init and cov_init
 
     Parameters
     ----------
     mu : array_like
         list or 1d-array of length n_features; means of agent's system state
-        before practice trials.
+        before practice trials
     cov : ndarrary
         array of size len(mu) x len(mu)
        covariance of agent's system state
-    mu_true : array_like
+    mu_init : array_like
         list or 1d-array of length n_features; means of p_true
-        before practice trials.
-    cov_true : ndarrary
+        before practice trials
+    cov_init : ndarrary
         array of size len(mu) x len(mu)
         covariance of p_true
     alpha : float
          magnitude of shift in mu towards currently 'presented' feature vector.
     stim : ndarray
         feature value combinations for the stimulus
+    stim_dur: int
+        presentation duration of stim in arbitrary units of time
     w_r : float, optional
         realtive weight of r(t) for calculating A(t). The default is 1.
     w_V : float, optional
@@ -199,45 +191,44 @@ def calc_predictions(mu, cov, mu_true, cov_true, alpha,
         constant to be added to predicted A(t). The default is 0.
     return_mu : bool, optional
         whether to return updated value of mu. The default is False.
-    return_r_t : bool, optional
-        whether to return predicted r(t). The default is False.
-    return_dV : bool, optional
-        whether to return predicted Delta-V(t). The default is False.
 
     Returns
     -------
     A_t : float
-        predicted A(t) for stim.
+        predicted A(t) for stim
     mu_new : array, float, optional
         list or 1d-array of length n_features;
-        means of agent's system state after exposure.
+        means of agent's system state after exposure
     r_t : float, optional
-        predicted r(t) for stim.
-    delta_V : float, optional
-        predicted Delta-V(t) for stim.
+        predicted r(t) for stim
     """
     if np.array(mu).shape==() or np.array(mu).shape==(1,):
         n_features = 1
     else:
         n_features = len(mu)
-        
+
     mu_new = mu.copy()
     mu_new = np.array(mu_new).astype(float)
 
     # update mu because at this moment, agent is exposed to stim
-    mu_new = mu_new + ((stim - mu_new) * alpha)
+    if stim_dur==0:
+        mu_new = mu_new + ((stim - mu_new) * alpha)
+    else:
+        s_minus_mu = stim - mu_new
+        sum_change = s_minus_mu * (1-(1-alpha) ** stim_dur)
+        mu_new = mu_new + sum_change
 
     # get r
     r_t = np.exp(logLik_from_mahalanobis(stim, mu_new, cov))
 
     # get V(t)
-    V_t = n_features - KL_distributions(mu_true, cov_true, mu_new, cov)
+    V_t = n_features - KL_distributions(mu_init, cov_init, mu_new, cov)
 
     # expected mu
     mu_exp = mu_new + ((stim - mu_new) * alpha)
 
     # get estimate for V(t+1)
-    V_t_exp = n_features - KL_distributions(mu_true, cov_true, mu_exp, cov)
+    V_t_exp = n_features - KL_distributions(mu_init, cov_init, mu_exp, cov)
 
     # get delta-V
     delta_V = V_t_exp - V_t
@@ -265,3 +256,191 @@ def calc_predictions(mu, cov, mu_true, cov_true, alpha,
             return A_t, delta_V
         else:
             return A_t
+
+def get_view_time(mu_0, cov_state, mu_true, cov_true, alpha,
+                    stim, threshold, w_r=1, w_V=1, bias=0, min_t=1, max_t=1e3,
+                    return_mu=False):
+    """
+
+
+    Parameters
+    ----------
+    mu_0 : TYPE
+        DESCRIPTION.
+    cov_state : TYPE
+        DESCRIPTION.
+    mu_true : TYPE
+        DESCRIPTION.
+    cov_true : TYPE
+        DESCRIPTION.
+    alpha : TYPE
+        DESCRIPTION.
+    w_r : TYPE
+        DESCRIPTION.
+    w_V : TYPE
+        DESCRIPTION.
+    bias : TYPE
+        DESCRIPTION.
+    stim : TYPE
+        DESCRIPTION.
+    threshold : TYPE
+        DESCRIPTION.
+    min_t : TYPE
+        DESCRIPTION.
+    max_t : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    view_time : TYPE
+        DESCRIPTION.
+
+    """
+
+    new_mu = mu_0.copy()
+    t = 0
+    done = False
+    while not done:
+        main_A, new_mu = calc_predictions(new_mu, cov_state, mu_true, cov_true,
+                                          alpha, stim, w_r, w_V, bias,
+                                          return_mu=True)
+        if main_A < threshold and t >= min_t:
+            done = True
+            view_time = t
+        else:
+            t += 1
+         # abort if t gets ridiculously high
+        if t > max_t:
+            done = True
+            view_time = t
+    if return_mu:
+        return view_time, new_mu
+    else:
+        return view_time
+
+def predict_ratings(mu_0, cov_state, mu_true, cov_true, alpha, w_r, w_V,
+                    stims, stim_dur, bias=0):
+    """
+    Predict ratings defined as A(stim_dur) for a series of stimuli (stims).
+
+    Parameters
+    ----------
+    mu_0 : TYPE
+        DESCRIPTION.
+    cov_state : TYPE
+        DESCRIPTION.
+    mu_true : TYPE
+        DESCRIPTION.
+    cov_true : TYPE
+        DESCRIPTION.
+    alpha : TYPE
+        DESCRIPTION.
+    w_r : TYPE
+        DESCRIPTION.
+    w_V : TYPE
+        DESCRIPTION.
+    stims : TYPE
+        DESCRIPTION.
+    stim_dur : TYPE
+        DESCRIPTION.
+    bias : TYPE, optional
+        DESCRIPTION. The default is 0.
+
+    Returns
+    -------
+    pred_ratings 1D-array
+        DESCRIPTION.
+
+    """
+    pred_ratings = []
+    new_mu = mu_0.copy()
+
+    # incase we only get 1 stim dur, assume it is always the same
+    if len(stim_dur)==1:
+        durations = np.repeat(stim_dur,len(stims))
+    else:
+        durations = stim_dur
+
+    trial = 0
+    for stim in stims:
+        new_mu = simulate_practice_trials(new_mu, cov_state, alpha,
+                                           stim, n_stims=1,
+                                           stim_dur=durations[trial])
+        A_t, new_mu = calc_predictions(new_mu, cov_state,
+                                         mu_true, cov_true,
+                                         alpha,
+                                         stim,
+                                         w_r=w_r, w_V=w_V,
+                                         bias=bias,
+                                         return_mu=True)
+        pred_ratings.append(A_t)
+        trial += 1
+
+    return np.array(pred_ratings, dtype=float)
+
+def get_view_times(mu_0, cov_state, mu_true, cov_true, alpha, w_r, w_V,
+                   stims, thresholds, min_view_time=1, max_view_time=1e3):
+    """
+    Calculate predicted viewing times for all stims presented in the given
+    order. Predictions are based on whether or not A(t) for the current
+    stimulus is greater or equal to thresholds.
+
+    Parameters
+    ----------
+    mu_0 : TYPE
+        DESCRIPTION.
+    cov_state : TYPE
+        DESCRIPTION.
+    mu_true : TYPE
+        DESCRIPTION.
+    cov_true : TYPE
+        DESCRIPTION.
+    alpha : TYPE
+        DESCRIPTION.
+    w_r : TYPE
+        DESCRIPTION.
+    w_V : TYPE
+        DESCRIPTION.
+    stims : TYPE
+        DESCRIPTION.
+    sim_ratings : TYPE
+        DESCRIPTION.
+    min_view_time : TYPE, optional
+        DESCRIPTION. The default is 1.
+    max_view_time : TYPE, optional
+        DESCRIPTION. The default is 1e3.
+
+    Returns
+    -------
+    view_times : TYPE
+        DESCRIPTION.
+    new_mu : TYPE
+        DESCRIPTION.
+
+    """
+    view_times = []
+    new_mu = mu_0.copy()
+    for trial in range(len(stims)-1):
+        main_stim = stims[trial,:]
+        threshold = thresholds[trial+1]
+
+        # reset timer at start of each trial
+        t = 0
+        done = False
+        while not done:
+            main_A, new_mu = calc_predictions(new_mu, cov_state,
+                                         mu_true, cov_true,
+                                         alpha, main_stim, w_r=w_r,
+                                         w_V=w_V, bias=0,
+                                         return_mu=True)
+            if t > min_view_time and main_A < threshold:
+                done = True
+                view_times.append(t)
+            else:
+                t+=1
+             # abort if t gets ridiculously high
+            if t > max_view_time:
+                done = True
+                view_times.append(t)
+
+    return view_times, new_mu
